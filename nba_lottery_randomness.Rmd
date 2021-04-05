@@ -1,0 +1,111 @@
+---
+title: "NBA lottery randomness"
+author: "Paul Hatini"
+date: "4/4/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## NBA draft lottery
+
+The NBA draft is an annual event where teams draft the rights to sign eligible players who wish to join the league. In order to determine the draft order, the league uses "a lottery-style ping-pong machine with 14 balls numbered 1-14". Four balls are drawn from the machine. Before the lottery, of the 1001 possible ping-pong ball combinations, 1000 are assigned to the 14 teams who did not make the previous playoffs. If the combinations assigned to the same team are drawn more than once, the result is discarded and another four-ball combination is selected. 
+
+## Rule change
+
+Before  2019, the lottery process was used to determine the top 3 picks in the draft. Picks 4-14 were made in reverse order of record from the previous season from the remaining teams. The combinations assigned to each team under the old system are displayed below:
+
+```{r}
+chances <- c(250, 199, 156, 119, 88, 63, 43, 28, 17, 11, 8, 7, 6, 5)
+barplot(chances)
+```
+
+Starting in 2019, the lottery odds were 'flattened' in order to disincentivize teams losing games on purpose in order to receive a higher probability chance to draft the best players. The combinations assigned to each team under the new system are displayed below. In addition, the lottery system is now used to determine the top 4 picks in the draft.
+
+```{r}
+chances <- c(140, 140, 140, 125, 105, 90, 75, 60, 45, 30, 20, 15, 10, 5)
+barplot(chances)
+```
+
+## Permutation test
+
+My aim is to determine the effect of the rule change on the variance of the draft order. In order to do this I simulated 100,000 draft lotteries under the old rules and employed the permutation test to see where the results of the past two NBA lotteries would fall in the distribution.
+
+I began by writing a function to simulate one drawing from the lottery machine:
+
+```{r}
+chances <- c(250, 199, 156, 119, 88, 63, 43, 28, 17, 11, 8, 7, 6, 5)
+
+sim_pick <- function(chances) {
+  prob <- chances/sum(chances)
+  pick <- rmultinom(1, 1, chances)
+  return(which(pick == 1))
+}
+
+sim_pick(chances)
+```
+
+Next I wrote a function to simulate the entire draft lottery under the old rules. 
+
+```{r}
+sim_lottery <- function(chances) {
+  pick_1 <- sim_pick(chances)
+  chances[pick_1] <- 0
+  pick_2 <- sim_pick(chances)
+  chances[pick_2] <- 0
+  pick_3 <- sim_pick(chances)
+  chances[pick_3] <- 0
+  return(c(pick_1, pick_2, pick_3, which(chances != 0)))
+}
+
+sim_lottery(chances)
+```
+
+Finally, I wrote 100,000 lottery simulation instances to a matrix.
+
+```{r}
+lottery_sims <- matrix(ncol=14, nrow=100000)
+
+for (i in 1:nrow(lottery_sims)) {
+  lottery_sims[i,] <- sim_lottery(chances)
+}
+```
+
+In order to compare the results of the 2019 and 2020 NBA draft lotteries to my simulated distribution, I've chosen to evaluate randomness based on the sum of the standing of the lottery winning teams.
+
+In 2019, the New Orleans Pelicans moved up from the 7 slot to win the rights to draft Duke's Zion Williamson first overall. The Memphis Grizzlies moved up from 8th to eventually draft Ja Morant second. Next, the Knicks, with the league's worst record, earned the 3rd overall pick, which they would use to select RJ Barrett. Finally, the Lakers moved up from 11th to the fourth pick, which they eventually traded to the Pelican's as part of a package for Anthony Davis. The sum of the positions here is 27.
+
+In 2020, the Minnesota Timberwolves won the draft lottery from the 3rd slot, the league worst Warriors drafted second, the Charlotte Hornets moved up from the 8th worst record to draft third, and the Bulls moved up from 7th to draft fourth. The sum of the positions in 2020 was 19.
+
+In the bar plot below, I've displayed the results from my lottery simulation as well as lines showing where the actual values for the 2019 and 2020 lotteries fall.
+
+```{r}
+counts <- lottery_sims[,1] + lottery_sims[,2] + lottery_sims[,3] + lottery_sims[,4]
+counts_table  <- table(counts)
+
+barplot(counts_table)
+abline(v=11.5, col="red")
+abline(v=21.1, col="red")
+```
+
+To add some numbers, the p-value for the lottery observed in 2019 is 0.00408. That is, the probability of a lottery result where the sum of the standings of the lottery winning teams is as or more extreme as the observed value is 0.00408.
+
+```{r}
+length(which(counts >= 27))/length(counts)
+```
+
+The p-value of the 2020 lottery is 0.10499.
+
+```{r}
+length(which(counts >= 19))/length(counts)
+```
+
+## Conclusion
+
+The 2019 and 2020 lottery results give reason to believe that lottery reform has significantly altered the distribution of lottery winning teams. In particular, the 2019 results are statistically significantly different than expectation at the alpha = 0.05 level. It appears that the rule change has the potential to disincentivize the race to the very bottom of the standings. However, the incentive to be merely bad as opposed to middling may be greater. Whether or not these effects lead to a change in the distribution of records will be interesting to observe. 
+
+Future research to quantify the disorder of the lottery more completely than the sum of the standing of the lottery winners  is intended.
